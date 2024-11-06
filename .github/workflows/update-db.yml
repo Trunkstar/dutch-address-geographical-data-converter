@@ -1,0 +1,44 @@
+name: Update Database
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Runs at 00:00 on Monday
+  workflow_dispatch:      # Allows manual trigger
+
+jobs:
+  update-database:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # Needed for pushing changes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Download source database
+        run: |
+          wget -O bag-light.gpkg https://service.pdok.nl/lv/bag/atom/downloads/bag-light.gpkg
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run conversion
+        run: go run main.go
+
+      - name: Prepare dist directory
+        run: |
+          mkdir -p dist
+          mv converted.db dist/
+          
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add dist/converted.db
+          git commit -m "Update converted.db [skip ci]" || exit 0
+          git push 
