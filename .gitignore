@@ -1,0 +1,4 @@
+*.gpkg*
+*.db*
+*.csv
+.DS_Store

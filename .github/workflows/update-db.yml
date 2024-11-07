@@ -1,0 +1,72 @@
+name: Update Database
+
+on:
+  schedule:
+    - cron: '0 0 */5 * *'  # Runs at 00:00 every 5 days
+  workflow_dispatch:      # Allows manual trigger
+
+jobs:
+  update-and-upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # Needed for pushing changes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Download source database
+        run: |
+          wget -O bag-light.gpkg https://service.pdok.nl/lv/bag/atom/downloads/bag-light.gpkg
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run conversion
+        run: |
+          go run main.go
+          go run main.go -optimize
+
+      - name: Upload to filebin
+        id: upload
+        run: |
+          # Create a new bin
+          RESPONSE=$(curl -X POST https://filebin.net/new)
+          BIN_ID=$(echo $RESPONSE | jq -r '.bin.id')
+          
+          if [ -z "$BIN_ID" ]; then
+            echo "Failed to create bin"
+            exit 1
+          fi
+          
+          # Upload file and get response
+          UPLOAD_RESPONSE=$(curl -X POST \
+            -F "file=@converted.db" \
+            "https://filebin.net/${BIN_ID}")
+          
+          # Verify upload was successful
+          if ! echo $UPLOAD_RESPONSE | jq -e '.filename' > /dev/null; then
+            echo "Failed to upload file"
+            echo "Response: $UPLOAD_RESPONSE"
+            exit 1
+          fi
+          
+          FILENAME=$(echo $UPLOAD_RESPONSE | jq -r '.filename')
+          echo "download_url=https://filebin.net/${BIN_ID}/${FILENAME}" >> $GITHUB_OUTPUT
+
+      - name: Update files
+        run: |
+          # Write only the URL to text file
+          echo "${{ steps.upload.outputs.download_url }}" > download_url.txt
+          
+          # Commit both files
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add README.md download_url.txt
+          git commit -m "Update database download link [skip ci]" || exit 0
+          git push
