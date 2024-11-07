@@ -24,7 +24,7 @@ UPLOAD_RESPONSE=$(curl \
     -H "Accept: application/json" \
     -H "cid: github-actions-uploader" \
     -H "Content-Type: application/octet-stream" \
-    --data-binary "@$FILE_PATH" \
+    -T "$FILE_PATH" \
     "https://filebin.net/$BIN_ID/$FILE_NAME")
 
 if [ $? -ne 0 ]; then
