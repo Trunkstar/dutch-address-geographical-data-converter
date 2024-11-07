@@ -32,32 +32,12 @@ jobs:
           go run main.go
           go run main.go -optimize
 
-      - name: Upload to filebin
+      - name: Upload database
         id: upload
         run: |
-          # Create a new bin
-          RESPONSE=$(curl -X POST https://filebin.net/new)
-          BIN_ID=$(echo $RESPONSE | jq -r '.bin.id')
-          
-          if [ -z "$BIN_ID" ]; then
-            echo "Failed to create bin"
-            exit 1
-          fi
-          
-          # Upload file and get response
-          UPLOAD_RESPONSE=$(curl -X POST \
-            -F "file=@converted.db" \
-            "https://filebin.net/${BIN_ID}")
-          
-          # Verify upload was successful
-          if ! echo $UPLOAD_RESPONSE | jq -e '.filename' > /dev/null; then
-            echo "Failed to upload file"
-            echo "Response: $UPLOAD_RESPONSE"
-            exit 1
-          fi
-          
-          FILENAME=$(echo $UPLOAD_RESPONSE | jq -r '.filename')
-          echo "download_url=https://filebin.net/${BIN_ID}/${FILENAME}" >> $GITHUB_OUTPUT
+          chmod +x scripts/upload.sh
+          DOWNLOAD_URL=$(./scripts/upload.sh converted.db)
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
 
       - name: Update files
         run: |
